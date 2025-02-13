@@ -22,10 +22,21 @@ class Movie(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    genre = models.CharField(max_length=100)
+    duration = models.IntegerField()
+    language = models.CharField(max_length=50)
+    director = models.CharField(max_length=100)
+    actors = models.TextField()
+    is_featured = models.BooleanField(default=False)
+    views_count = models.IntegerField(default=0)
 
     def update_rating(self):
         avg_rating = self.reviews.aggregate(Avg('rating'))['rating__avg']
         self.rating = avg_rating if avg_rating else 0
+        self.save()
+
+    def increment_views(self):
+        self.views_count += 1
         self.save()
 
     def __str__(self):

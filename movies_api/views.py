@@ -109,3 +109,15 @@ class LogoutView(generics.GenericAPIView):
             return Response(status=status.HTTP_205_RESET_CONTENT)
         except Exception:
             return Response(status=status.HTTP_400_BAD_REQUEST)
+
+class FeaturedMoviesView(generics.ListAPIView):
+    queryset = Movie.objects.filter(is_featured=True)
+    serializer_class = MovieListSerializer
+
+class TopRatedMoviesView(generics.ListAPIView):
+    queryset = Movie.objects.order_by('-rating')[:10]
+    serializer_class = MovieListSerializer
+
+class MostViewedMoviesView(generics.ListAPIView):
+    queryset = Movie.objects.order_by('-views_count')[:10]
+    serializer_class = MovieListSerializer
