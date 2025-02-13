@@ -6,7 +6,7 @@ from rest_framework_simplejwt.views import (
 from . import views
 
 urlpatterns = [
-    # API endpoints
+    # API
     path('movies/', views.MovieListCreateView.as_view(), name='movie-list-create'),
     path('movies/<int:pk>/', views.MovieDetailView.as_view(), name='movie-detail'),
     path('reviews/', views.ReviewListCreateView.as_view(), name='review-list-create'),
