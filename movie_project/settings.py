@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'movies_api',
     'movies_django',
+    'config',
     'rest_framework',
     'drf_yasg',
     'django_filters',

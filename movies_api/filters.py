@@ -1,5 +1,5 @@
 from django_filters import rest_framework as filters
-from .models import Movie, Review, Collection
+from config.models import Movie, Review, Collection
 
 class MovieFilter(filters.FilterSet):
     min_rating = filters.NumberFilter(field_name="rating", lookup_expr='gte')

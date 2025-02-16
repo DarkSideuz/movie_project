@@ -7,13 +7,14 @@ from django.contrib.auth import get_user_model, authenticate
 from django.db.models import Count, Avg
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import (
-    Movie, Review, Genre, Person, Country, MovieCast, 
-    Watchlist, MovieImage, Award, MovieAward, Subtitle,
-    Collection, UserProfile, MovieList, MovieReport,
-    MovieSeason, MovieEpisode, UserActivity, Notification
+from config.models import (
+    Movie, Review, Genre, Person, Country, 
+    MovieImage,
+    Collection,  MovieList, MovieReport,
+    MovieSeason, MovieEpisode, UserActivity
 )
-from .serializers import (
+from movies_django.models import UserProfile
+from movies_api.serializers import (
     MovieListSerializer, MovieDetailSerializer, ReviewSerializer, MovieSerializer,
     GenreSerializer, PersonSerializer, CountrySerializer,
     MovieCastSerializer, MovieImageSerializer, AwardSerializer,
@@ -23,18 +24,18 @@ from .serializers import (
     MovieEpisodeSerializer, UserActivitySerializer,
     NotificationSerializer, RegisterSerializer, UserSerializer
 )
-from .pagination import MovieListPagination, ReviewListPagination, CollectionListPagination
-from .permissions import (
+from movies_api.pagination import MovieListPagination, ReviewListPagination, CollectionListPagination
+from movies_api.permissions import (
     IsAdminOrReadOnly, IsOwnerOrReadOnly, 
     IsCollectionOwnerOrReadOnly
 )
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-from .throttling import AnonMovieRateThrottle, UserMovieRateThrottle
+from movies_api.throttling import AnonMovieRateThrottle, UserMovieRateThrottle
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework.decorators import action
-from .filters import MovieFilter
+from movies_api.filters import MovieFilter
 
 User = get_user_model()
 
@@ -86,28 +87,35 @@ class MovieDetailView(generics.RetrieveUpdateDestroyAPIView):
 class ReviewListCreateView(generics.ListCreateAPIView):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
-    permission_classes = [IsAuthenticated]
-    throttle_classes = [UserMovieRateThrottle]
-    pagination_class = ReviewListPagination
-    filter_backends = [filters.OrderingFilter]
-    ordering_fields = ['rating', 'created_at']
 
-    @swagger_auto_schema(
-        operation_description="Get list of reviews",
-        manual_parameters=[
-            openapi.Parameter('page', openapi.IN_QUERY, description="Page number", type=openapi.TYPE_INTEGER),
-            openapi.Parameter('ordering', openapi.IN_QUERY, description="Order by rating or created_at", type=openapi.TYPE_STRING),
-        ]
-    )
-    def get(self, request, *args, **kwargs):
-        return super().get(request, *args, **kwargs)
-    
-    @swagger_auto_schema(operation_description="Create a new review")
-    def post(self, request, *args, **kwargs):
-        return super().post(request, *args, **kwargs)
+    def create(self, request, *args, **kwargs):
+        movie_id = request.data.get('movie')
+        user = request.user
 
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        # Yangi sharh yaratish
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            review = serializer.save(user=user)  # Foydalanuvchini avtomatik qo'shish
+            
+            # Kino ratingini yangilash
+            movie = Movie.objects.get(id=movie_id)
+            movie.update_rating()  # Ratingni yangilash
+            
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        if serializer.is_valid():
+            review = serializer.save()  # Sharhni yangilash
+            
+            # Kino ratingini yangilash
+            movie = instance.movie
+            movie.update_rating()  # Ratingni yangilash
+            
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class ReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Review.objects.all()
@@ -214,20 +222,6 @@ class MovieReportViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
-    serializer_class = NotificationSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        return Notification.objects.filter(user=self.request.user)
-
-    @action(detail=True, methods=['post'])
-    def mark_as_read(self, request, pk=None):
-        notification = self.get_object()
-        notification.is_read = True
-        notification.save()
-        return Response({'status': 'marked as read'})
-
 class MovieSeasonViewSet(viewsets.ModelViewSet):
     serializer_class = MovieSeasonSerializer
     permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
@@ -244,13 +238,6 @@ class MovieEpisodeViewSet(viewsets.ModelViewSet):
         season_id = self.kwargs.get('season_pk')
         return MovieEpisode.objects.filter(season_id=season_id)
 
-class UserActivityViewSet(viewsets.ReadOnlyModelViewSet):
-    serializer_class = UserActivitySerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        return UserActivity.objects.filter(user=self.request.user)
-
 class CountryViewSet(viewsets.ModelViewSet):
     queryset = Country.objects.all()
     serializer_class = CountrySerializer
@@ -258,3 +245,11 @@ class CountryViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save()
+
+class UserActivityViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = UserActivitySerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return UserActivity.objects.filter(user=self.request.user)
+    

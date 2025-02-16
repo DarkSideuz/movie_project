@@ -1,13 +1,13 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
-from .models import (
+from config.models import (
     Movie, Review, Genre, Person, Country, MovieCast, 
     Watchlist, MovieImage, Award, MovieAward, Subtitle,
-    Collection, UserProfile, MovieList, MovieReport,
+    Collection, MovieList, MovieReport,
     MovieSeason, MovieEpisode, UserActivity, Notification
 )
-
+from movies_django.models import UserProfile
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
@@ -78,7 +78,8 @@ class MovieSerializer(serializers.ModelSerializer):
 class ReviewSerializer(serializers.ModelSerializer):
     class Meta:
         model = Review
-        fields = ['movie', 'user', 'comment', 'rating', 'created_at', 'updated_at']
+        fields = ['id', 'movie', 'user', 'comment', 'rating', 'created_at', 'updated_at']
+        read_only_fields = ['user', 'created_at', 'updated_at']
 
 class MovieListSerializer(serializers.ModelSerializer):
     class Meta:
