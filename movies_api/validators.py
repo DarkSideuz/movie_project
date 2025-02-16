@@ -1,27 +1,34 @@
 from django.core.exceptions import ValidationError
-from django.core.validators import FileExtensionValidator
-from django.conf import settings
-import os
+from django.core.files.images import get_image_dimensions
+import magic
 
 def validate_file_size(value):
     filesize = value.size
-    name, extension = os.path.splitext(value.name)
-    image_extensions = ['.jpg', '.jpeg', '.png']
-    video_extensions = ['.mp4', '.mov', '.avi', '.mkv']
     
-    if extension.lower() in image_extensions:
-        if filesize > settings.MAX_POSTER_SIZE:
-            raise ValidationError(f"Maximum image size allowed is {settings.MAX_POSTER_SIZE // (1024*1024)}MB")
-    elif extension.lower() in video_extensions:
-        if filesize > settings.MAX_UPLOAD_SIZE:
-            raise ValidationError(f"Maximum video size allowed is {settings.MAX_UPLOAD_SIZE // (1024*1024)}MB")
+    if filesize > 10 * 1024 * 1024:  # 10MB
+        raise ValidationError("Maximum file size is 10MB")
 
-poster_validator = FileExtensionValidator(
-    allowed_extensions=['jpg', 'jpeg', 'png'],
-    message="Only JPG, JPEG and PNG image formats are allowed"
-)
+def poster_validator(image):
+    # Fayl turi tekshiruvi
+    file_type = magic.from_buffer(image.read(1024), mime=True)
+    if file_type not in ['image/jpeg', 'image/png']:
+        raise ValidationError("Only JPEG and PNG files are allowed")
+    
+    # O'lcham tekshiruvi
+    width, height = get_image_dimensions(image)
+    if width < 300 or height < 450:
+        raise ValidationError("Minimum image dimensions are 300x450 pixels")
+    
+    # Fayl hajmi tekshiruvi
+    if image.size > 5 * 1024 * 1024:  # 5MB
+        raise ValidationError("Maximum file size is 5MB")
 
-trailer_validator = FileExtensionValidator(
-    allowed_extensions=['mp4', 'mov', 'avi', 'mkv'],
-    message="Only MP4, MOV, AVI and MKV video formats are allowed"
-)
+def trailer_validator(video):
+    # Fayl turi tekshiruvi
+    file_type = magic.from_buffer(video.read(1024), mime=True)
+    if file_type not in ['video/mp4', 'video/quicktime']:
+        raise ValidationError("Only MP4 and MOV files are allowed")
+    
+    # Fayl hajmi tekshiruvi
+    if video.size > 100 * 1024 * 1024:  # 100MB
+        raise ValidationError("Maximum file size is 100MB")

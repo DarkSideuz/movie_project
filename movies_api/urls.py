@@ -4,6 +4,15 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 from . import views
+from rest_framework.routers import DefaultRouter
+from .views import MovieViewSet, ReviewViewSet, GenreViewSet, PersonViewSet, CountryViewSet
+
+router = DefaultRouter()
+router.register(r'movies', MovieViewSet)
+router.register(r'reviews', ReviewViewSet)
+router.register(r'genres', GenreViewSet)
+router.register(r'persons', PersonViewSet)
+router.register(r'countries', CountryViewSet)
 
 urlpatterns = [
     # API
@@ -21,4 +30,18 @@ urlpatterns = [
     
     # Registration
     path('register/', views.RegisterView.as_view(), name='register'),
+
+    # Genre URLs
+    path('genres/', views.GenreViewSet.as_view({'get': 'list', 'post': 'create'}), name='genre-list'),
+    path('genres/<int:pk>/', views.GenreViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='genre-detail'),
+
+    # Person URLs
+    path('persons/', views.PersonViewSet.as_view({'get': 'list', 'post': 'create'}), name='person-list'),
+    path('persons/<int:pk>/', views.PersonViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='person-detail'),
+
+    # Country URLs
+    path('countries/', views.CountryViewSet.as_view({'get': 'list', 'post': 'create'}), name='country-list'),
+    path('countries/<int:pk>/', views.CountryViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='country-detail'),
+
+    path('', include(router.urls)),
 ]

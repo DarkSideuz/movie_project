@@ -1,18 +1,40 @@
 from django.shortcuts import render
-from rest_framework import generics, filters, status
-from rest_framework.permissions import IsAuthenticated, AllowAny, IsAuthenticatedOrReadOnly
+from rest_framework import generics, filters, status, viewsets
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAuthenticatedOrReadOnly, IsAdminUser
 from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib.auth import get_user_model, authenticate
-from .models import Movie, Review
-from .serializers import MovieListSerializer, MovieDetailSerializer, ReviewSerializer, RegisterSerializer, UserSerializer, LoginSerializer
-from .pagination import MovieListPagination, ReviewListPagination
-from .permissions import IsAdminOrReadOnly, IsOwnerOrReadOnly
+from django.db.models import Count, Avg
+from django.utils import timezone
+from django_filters.rest_framework import DjangoFilterBackend
+from .models import (
+    Movie, Review, Genre, Person, Country, MovieCast, 
+    Watchlist, MovieImage, Award, MovieAward, Subtitle,
+    Collection, UserProfile, MovieList, MovieReport,
+    MovieSeason, MovieEpisode, UserActivity, Notification
+)
+from .serializers import (
+    MovieListSerializer, MovieDetailSerializer, ReviewSerializer, MovieSerializer,
+    GenreSerializer, PersonSerializer, CountrySerializer,
+    MovieCastSerializer, MovieImageSerializer, AwardSerializer,
+    MovieAwardSerializer, SubtitleSerializer, CollectionSerializer,
+    UserProfileSerializer, MovieListStatusSerializer,
+    MovieReportSerializer, MovieSeasonSerializer,
+    MovieEpisodeSerializer, UserActivitySerializer,
+    NotificationSerializer, RegisterSerializer, UserSerializer
+)
+from .pagination import MovieListPagination, ReviewListPagination, CollectionListPagination
+from .permissions import (
+    IsAdminOrReadOnly, IsOwnerOrReadOnly, 
+    IsCollectionOwnerOrReadOnly
+)
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from .throttling import AnonMovieRateThrottle, UserMovieRateThrottle
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from rest_framework.decorators import action
+from .filters import MovieFilter
 
 User = get_user_model()
 
@@ -20,7 +42,7 @@ User = get_user_model()
 
 class MovieListCreateView(generics.ListCreateAPIView):
     queryset = Movie.objects.all()
-    serializer_class = MovieListSerializer
+    serializer_class = MovieSerializer
     permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
     throttle_classes = [UserMovieRateThrottle]
     pagination_class = MovieListPagination
@@ -57,7 +79,7 @@ class MovieListCreateView(generics.ListCreateAPIView):
 
 class MovieDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Movie.objects.all()
-    serializer_class = MovieDetailSerializer
+    serializer_class = MovieSerializer
     permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
     throttle_classes = [UserMovieRateThrottle]
 
@@ -121,3 +143,118 @@ class TopRatedMoviesView(generics.ListAPIView):
 class MostViewedMoviesView(generics.ListAPIView):
     queryset = Movie.objects.order_by('-views_count')[:10]
     serializer_class = MovieListSerializer
+
+class UserProfileViewSet(viewsets.ModelViewSet):
+    serializer_class = UserProfileSerializer
+    permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]
+
+    def get_queryset(self):
+        return UserProfile.objects.filter(user=self.request.user)
+
+class MovieViewSet(viewsets.ModelViewSet):
+    queryset = Movie.objects.all()
+    serializer_class = MovieSerializer
+    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
+
+class ReviewViewSet(viewsets.ModelViewSet):
+    queryset = Review.objects.all()
+    serializer_class = ReviewSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+class GenreViewSet(viewsets.ModelViewSet):
+    queryset = Genre.objects.all()
+    serializer_class = GenreSerializer
+    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
+
+class PersonViewSet(viewsets.ModelViewSet):
+    queryset = Person.objects.all()
+    serializer_class = PersonSerializer
+    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
+
+class CollectionViewSet(viewsets.ModelViewSet):
+    serializer_class = CollectionSerializer
+    permission_classes = [IsAuthenticated, IsCollectionOwnerOrReadOnly]
+    pagination_class = CollectionListPagination
+
+    def get_queryset(self):
+        return Collection.objects.filter(
+            created_by=self.request.user
+        ).prefetch_related('movies')
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def add_movie(self, request, pk=None):
+        collection = self.get_object()
+        movie_id = request.data.get('movie_id')
+        
+        try:
+            movie = Movie.objects.get(id=movie_id)
+            collection.movies.add(movie)
+            return Response({'status': 'movie added'})
+        except Movie.DoesNotExist:
+            return Response(
+                {'error': 'Movie not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+class MovieReportViewSet(viewsets.ModelViewSet):
+    serializer_class = MovieReportSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user.is_staff:
+            return MovieReport.objects.all()
+        return MovieReport.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = NotificationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Notification.objects.filter(user=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def mark_as_read(self, request, pk=None):
+        notification = self.get_object()
+        notification.is_read = True
+        notification.save()
+        return Response({'status': 'marked as read'})
+
+class MovieSeasonViewSet(viewsets.ModelViewSet):
+    serializer_class = MovieSeasonSerializer
+    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
+
+    def get_queryset(self):
+        movie_id = self.kwargs.get('movie_pk')
+        return MovieSeason.objects.filter(movie_id=movie_id)
+
+class MovieEpisodeViewSet(viewsets.ModelViewSet):
+    serializer_class = MovieEpisodeSerializer
+    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
+
+    def get_queryset(self):
+        season_id = self.kwargs.get('season_pk')
+        return MovieEpisode.objects.filter(season_id=season_id)
+
+class UserActivityViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = UserActivitySerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return UserActivity.objects.filter(user=self.request.user)
+
+class CountryViewSet(viewsets.ModelViewSet):
+    queryset = Country.objects.all()
+    serializer_class = CountrySerializer
+    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
+
+    def perform_create(self, serializer):
+        serializer.save()
