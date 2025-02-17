@@ -92,14 +92,14 @@ class ReviewListCreateView(generics.ListCreateAPIView):
         movie_id = request.data.get('movie')
         user = request.user
 
-        # Yangi sharh yaratish
+        
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
-            review = serializer.save(user=user)  # Foydalanuvchini avtomatik qo'shish
+            review = serializer.save(user=user)  
             
-            # Kino ratingini yangilash
+            
             movie = Movie.objects.get(id=movie_id)
-            movie.update_rating()  # Ratingni yangilash
+            movie.update_rating() 
             
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -108,11 +108,11 @@ class ReviewListCreateView(generics.ListCreateAPIView):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         if serializer.is_valid():
-            review = serializer.save()  # Sharhni yangilash
+            review = serializer.save() 
             
-            # Kino ratingini yangilash
+            
             movie = instance.movie
-            movie.update_rating()  # Ratingni yangilash
+            movie.update_rating()  
             
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

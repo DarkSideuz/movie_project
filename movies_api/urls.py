@@ -30,18 +30,15 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('token/verify/', TokenVerifyView.as_view(), name='token_verify'),
     
-    # Registration
     path('register/', views.RegisterView.as_view(), name='register'),
 
     # Genre URLs
     path('genres/', views.GenreViewSet.as_view({'get': 'list', 'post': 'create'}), name='genre-list'),
     path('genres/<int:pk>/', views.GenreViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='genre-detail'),
 
-    # Person URLs
     path('persons/', views.PersonViewSet.as_view({'get': 'list', 'post': 'create'}), name='person-list'),
     path('persons/<int:pk>/', views.PersonViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='person-detail'),
 
-    # Country URLs
     path('countries/', views.CountryViewSet.as_view({'get': 'list', 'post': 'create'}), name='country-list'),
     path('countries/<int:pk>/', views.CountryViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='country-detail'),
 
